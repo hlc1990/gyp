@@ -39,7 +39,7 @@ def CalculateVariables(default_variables, params):
   default_variables.setdefault('OS', gyp.common.GetFlavor(params))
 
   flavor = gyp.common.GetFlavor(params)
-  if flavor =='win':
+  if flavor =='win' or flavor =='winrt':
     # Copy additional generator configuration data from VS, which is shared
     # by the Windows Ninja generator.
     import gyp.generator.msvs as msvs_generator

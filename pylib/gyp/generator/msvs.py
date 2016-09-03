@@ -86,6 +86,7 @@ generator_additional_non_configuration_keys = [
     'msvs_enable_winrt',
     'msvs_requires_importlibrary',
     'msvs_enable_winphone',
+    'msvs_package_certificate',
     'msvs_application_type_revision',
     'msvs_target_platform_version',
     'msvs_target_platform_minversion',
@@ -268,6 +269,12 @@ def _ToolSetOrAppend(tools, tool_name, setting, value, only_if_unset=False):
               value, setting, tool_name, str(tool[setting])))
   else:
     tool[setting] = value
+
+def _ToolSet(tools, tool_name, setting, value):
+  if not tools.get(tool_name):
+    tools[tool_name] = dict()
+  tool = tools[tool_name]
+  tool[setting] = value
 
 
 def _ConfigPlatform(config_data):
@@ -987,7 +994,7 @@ def _GenerateMSVSProject(project, options, version, generator_flags):
 
   config_type = _GetMSVSConfigurationType(spec, project.build_file)
   for config_name, config in spec['configurations'].iteritems():
-    _AddConfigurationToMSVSProject(p, spec, config_type, config_name, config)
+    _AddConfigurationToMSVSProject(p, spec, config_type, config_name, config, options)
 
   # MSVC08 and prior version cannot handle duplicate basenames in the same
   # target.
@@ -1098,7 +1105,7 @@ def _GetMSVSConfigurationType(spec, build_file):
   return config_type
 
 
-def _AddConfigurationToMSVSProject(p, spec, config_type, config_name, config):
+def _AddConfigurationToMSVSProject(p, spec, config_type, config_name, config, options):
   """Adds a configuration to the MSVS project.
 
   Many settings in a vcproj file are specific to a configuration.  This
@@ -1182,7 +1189,7 @@ def _AddConfigurationToMSVSProject(p, spec, config_type, config_name, config):
   if def_file:
     _ToolAppend(tools, 'VCLinkerTool', 'ModuleDefinitionFile', def_file)
 
-  _AddConfigurationToMSVS(p, spec, tools, config, config_type, config_name)
+  _AddConfigurationToMSVS(p, spec, tools, config, config_type, config_name, options)
 
 
 def _GetIncludeDirs(config):
@@ -1370,7 +1377,7 @@ def _ConvertToolsToExpectedForm(tools):
   return tool_list
 
 
-def _AddConfigurationToMSVS(p, spec, tools, config, config_type, config_name):
+def _AddConfigurationToMSVS(p, spec, tools, config, config_type, config_name, options):
   """Add to the project file the configuration specified by config.
 
   Arguments:
@@ -1382,14 +1389,14 @@ def _AddConfigurationToMSVS(p, spec, tools, config, config_type, config_name):
     config_type: The configuration type, a number as defined by Microsoft.
     config_name: The name of the configuration.
   """
-  attributes = _GetMSVSAttributes(spec, config, config_type)
+  attributes = _GetMSVSAttributes(spec, config, config_type, options, None)
   # Add in this configuration.
   tool_list = _ConvertToolsToExpectedForm(tools)
   p.AddConfig(_ConfigFullName(config_name, config),
               attrs=attributes, tools=tool_list)
 
 
-def _GetMSVSAttributes(spec, config, config_type):
+def _GetMSVSAttributes(spec, config, config_type, options, project):
   # Prepare configuration attributes.
   prepared_attrs = {}
   source_attrs = config.get('msvs_configuration_attributes', {})
@@ -1404,6 +1411,8 @@ def _GetMSVSAttributes(spec, config, config_type):
   prepared_attrs['ConfigurationType'] = config_type
   output_dir = prepared_attrs.get('OutputDirectory',
                                   '$(SolutionDir)$(ConfigurationName)')
+  if hasattr(options, "outputDirSuffix"):
+    output_dir = output_dir.replace('build', 'build' + options.outputDirSuffix)
   prepared_attrs['OutputDirectory'] = _FixPath(output_dir) + '\\'
   if 'IntermediateDirectory' not in prepared_attrs:
     intermediate = '$(ConfigurationName)\\obj\\$(ProjectName)'
@@ -1412,6 +1421,10 @@ def _GetMSVSAttributes(spec, config, config_type):
     intermediate = _FixPath(prepared_attrs['IntermediateDirectory']) + '\\'
     intermediate = MSVSSettings.FixVCMacroSlashes(intermediate)
     prepared_attrs['IntermediateDirectory'] = intermediate
+  if (hasattr(options, "outputDirSuffix") and project is not None):
+    intermediate = prepared_attrs['IntermediateDirectory']
+    newInterm = intermediate.replace('$(ProjectName)', project.name)
+    prepared_attrs['IntermediateDirectory'] = newInterm
   return prepared_attrs
 
 
@@ -1583,7 +1596,6 @@ def _AddToolFilesToMSVS(p, spec):
   for f in tool_files:
     p.AddToolFile(f)
 
-
 def _HandlePreCompiledHeaders(p, sources, spec):
   # Pre-compiled header source stubs need a different compiler flag
   # (generate precompiled header) and any source file not of the same
@@ -1687,7 +1699,7 @@ def _GetCopies(spec):
         src_bare = src[:-1]
         base_dir = posixpath.split(src_bare)[0]
         outer_dir = posixpath.split(src_bare)[1]
-        cmd = 'cd "%s" && xcopy /e /f /y "%s" "%s\\%s\\"' % (
+        cmd = 'pushd "%s" && xcopy /e /f /y "%s" "%s\\%s\\" && popd' % (
             _FixPath(base_dir), outer_dir, _FixPath(dst), outer_dir)
         copies.append(([src], ['dummy_copies', dst], cmd,
                        'Copying %s to %s' % (src, dst)))
@@ -1918,6 +1930,13 @@ def CalculateVariables(default_variables, params):
   if gyp.common.GetFlavor(params) == 'ninja':
     default_variables['SHARED_INTERMEDIATE_DIR'] = '$(OutDir)gen'
 
+  print >> sys.stdout, "Flavor: " + gyp.common.GetFlavor(params)
+
+  if gyp.common.GetFlavor(params) == 'winrt':
+    default_variables['OS_RUNTIME'] = 'winrt'
+  else:
+    default_variables['OS_RUNTIME'] = 'win32'
+
 
 def PerformBuild(data, configurations, params):
   options = params['options']
@@ -1936,7 +1955,6 @@ def PerformBuild(data, configurations, params):
     arguments = [devenv, sln_path, '/Build', config]
     print 'Building [%s]: %s' % (config, arguments)
     rtn = subprocess.check_call(arguments)
-
 
 def CalculateGeneratorInputInfo(params):
   if params.get('flavor') == 'ninja':
@@ -1998,6 +2016,10 @@ def GenerateOutput(target_list, target_dicts, data, params):
   missing_sources = []
   for project in project_objects.values():
     fixpath_prefix = project.fixpath_prefix
+    # HACK: Temporarily force WinRT in projects until condition for OS_RUNTIME='WINRT' is in every gyp file.
+    # Exception: the "protoc" project
+    if params.get('flavor') == 'winrt' and project.name != "protoc":
+        project.spec['msvs_enable_winrt'] = '1'
     missing_sources.extend(_GenerateProject(project, options, msvs_version,
                                             generator_flags))
   fixpath_prefix = None
@@ -2033,7 +2055,7 @@ def GenerateOutput(target_list, target_dicts, data, params):
 
 
 def _GenerateMSBuildFiltersFile(filters_path, source_files,
-                                rule_dependencies, extension_to_rule_name):
+                                rule_dependencies, extension_to_rule_name, spec):
   """Generate the filters file.
 
   This file is used by Visual Studio to organize the presentation of source
@@ -2047,7 +2069,7 @@ def _GenerateMSBuildFiltersFile(filters_path, source_files,
   filter_group = []
   source_group = []
   _AppendFiltersForMSBuild('', source_files, rule_dependencies,
-                           extension_to_rule_name, filter_group, source_group)
+                           extension_to_rule_name, filter_group, source_group, spec)
   if filter_group:
     content = ['Project',
                {'ToolsVersion': '4.0',
@@ -2064,7 +2086,7 @@ def _GenerateMSBuildFiltersFile(filters_path, source_files,
 
 def _AppendFiltersForMSBuild(parent_filter_name, sources, rule_dependencies,
                              extension_to_rule_name,
-                             filter_group, source_group):
+                             filter_group, source_group, spec):
   """Creates the list of filters and sources to be added in the filter file.
 
   Args:
@@ -2089,11 +2111,11 @@ def _AppendFiltersForMSBuild(parent_filter_name, sources, rule_dependencies,
       # Recurse and add its dependents.
       _AppendFiltersForMSBuild(filter_name, source.contents,
                                rule_dependencies, extension_to_rule_name,
-                               filter_group, source_group)
+                               filter_group, source_group, spec)
     else:
       # It's a source.  Create a source entry.
       _, element = _MapFileToMsBuildSourceType(source, rule_dependencies,
-                                               extension_to_rule_name)
+                                               extension_to_rule_name, spec)
       source_entry = [element, {'Include': source}]
       # Specify the filter it is part of, if any.
       if parent_filter_name:
@@ -2102,7 +2124,7 @@ def _AppendFiltersForMSBuild(parent_filter_name, sources, rule_dependencies,
 
 
 def _MapFileToMsBuildSourceType(source, rule_dependencies,
-                                extension_to_rule_name):
+                                extension_to_rule_name, spec):
   """Returns the group and element type of the source file.
 
   Arguments:
@@ -2126,11 +2148,31 @@ def _MapFileToMsBuildSourceType(source, rule_dependencies,
     group = 'resource'
     element = 'ResourceCompile'
   elif ext == '.asm':
-    group = 'masm'
-    element = 'MASM'
+    #there is no MASM for ARM
+    if spec.get('msvs_enable_winphone') == '1':
+      group = 'rule_dependency'
+      element = 'CustomBuild'
+    else:
+      group = 'masm'
+      element = 'MASM'
   elif ext == '.idl':
     group = 'midl'
     element = 'Midl'
+  elif os.path.basename(source) == 'App.xaml':
+    group = 'xaml_app'
+    element = 'ApplicationDefinition'
+  elif ext == '.xaml':
+    group = 'xaml_page'
+    element = 'Page'
+  elif ext == '.appxmanifest':
+    group = 'appxmanifest'
+    element = 'AppxManifest'
+  elif ext == '.png':
+    group = 'image'
+    element = 'Image'
+  elif ext in ['.s', '.S']:
+    group = 'rule_dependency'
+    element = 'CustomBuild'
   elif source in rule_dependencies:
     group = 'rule_dependency'
     element = 'CustomBuild'
@@ -2175,7 +2217,7 @@ def _GenerateRulesForMSBuild(output_dir, options, spec,
     targets_path = os.path.join(output_dir, targets_name)
     xml_path = os.path.join(output_dir, xml_name)
 
-    _GenerateMSBuildRulePropsFile(props_path, msbuild_rules)
+    _GenerateMSBuildRulePropsFile(props_path, msbuild_rules, spec)
     _GenerateMSBuildRuleTargetsFile(targets_path, msbuild_rules)
     _GenerateMSBuildRuleXmlFile(xml_path, msbuild_rules)
 
@@ -2238,20 +2280,12 @@ class MSBuildRule(object):
     self.command = MSVSSettings.ConvertVCMacrosToMSBuild(old_command)
 
 
-def _GenerateMSBuildRulePropsFile(props_path, msbuild_rules):
+def _GenerateMSBuildRulePropsFile(props_path, msbuild_rules, spec):
   """Generate the .props file."""
   content = ['Project',
              {'xmlns': 'http://schemas.microsoft.com/developer/msbuild/2003'}]
   for rule in msbuild_rules:
     content.extend([
-        ['PropertyGroup',
-         {'Condition': "'$(%s)' == '' and '$(%s)' == '' and "
-          "'$(ConfigurationType)' != 'Makefile'" % (rule.before_targets,
-                                                    rule.after_targets)
-         },
-         [rule.before_targets, 'Midl'],
-         [rule.after_targets, 'CustomBuild'],
-        ],
         ['PropertyGroup',
          [rule.depends_on,
           {'Condition': "'$(ConfigurationType)' != 'Makefile'"},
@@ -2267,6 +2301,41 @@ def _GenerateMSBuildRulePropsFile(props_path, msbuild_rules):
          ],
         ]
     ])
+    #Windows phone (ARM) external assembler compiler is used
+    if rule.extension == '.asm' and spec.get('msvs_enable_winphone') == '1':
+      content.extend([
+        ['PropertyGroup',
+         {'Condition': "'$(%s)' == '' and '$(%s)' == '' and "
+          "'$(ConfigurationType)' != 'Makefile'" % (rule.before_targets,
+                                                    rule.after_targets)
+         },
+         [rule.before_targets, 'CustomBuild'],
+         [rule.after_targets, 'Midl'],
+        ]
+      ])
+    elif rule.extension == '.s' and spec.get('msvs_enable_winphone') == '1':
+      content.extend([
+        ['PropertyGroup',
+         {'Condition': "'$(%s)' == '' and '$(%s)' == '' and "
+          "'$(ConfigurationType)' != 'Makefile'" % (rule.before_targets,
+                                                    rule.after_targets)
+         },
+         [rule.before_targets, 'CustomBuild'],
+         [rule.after_targets, 'Midl'],
+        ]
+      ])
+    else:
+      content.extend([
+        ['PropertyGroup',
+         {'Condition': "'$(%s)' == '' and '$(%s)' == '' and "
+          "'$(ConfigurationType)' != 'Makefile'" % (rule.before_targets,
+                                                    rule.after_targets)
+         },
+         [rule.before_targets, 'Midl'],
+         [rule.after_targets, 'CustomBuild'],
+        ]
+      ])
+
   easy_xml.WriteXmlIfChanged(content, props_path, pretty=True, win32=True)
 
 
@@ -2636,7 +2705,7 @@ def _GetMSBuildProjectConfigurations(configurations):
   return [group]
 
 
-def _GetMSBuildGlobalProperties(spec, guid, gyp_file_name):
+def _GetMSBuildGlobalProperties(spec, guid, gyp_file_name, version):
   namespace = os.path.splitext(gyp_file_name)[0]
   properties = [
       ['PropertyGroup', {'Label': 'Globals'},
@@ -2651,12 +2720,16 @@ def _GetMSBuildGlobalProperties(spec, guid, gyp_file_name):
      os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64':
     properties[0].append(['PreferredToolArchitecture', 'x64'])
 
-  if spec.get('msvs_enable_winrt'):
+  if spec.get('msvs_enable_winrt') == '1':
     properties[0].append(['DefaultLanguage', 'en-US'])
     properties[0].append(['AppContainerApplication', 'true'])
     if spec.get('msvs_application_type_revision'):
       app_type_revision = spec.get('msvs_application_type_revision')
       properties[0].append(['ApplicationTypeRevision', app_type_revision])
+    elif version.ShortName() == '2015':
+      properties[0].append(['ApplicationTypeRevision', '10.0'])
+      properties[0].append(['WindowsTargetPlatformVersion', '10.0.10240.0'])
+      properties[0].append(['WindowsTargetPlatformMinVersion', '10.0.10240.0'])
     else:
       properties[0].append(['ApplicationTypeRevision', '8.1'])
 
@@ -2671,17 +2744,17 @@ def _GetMSBuildGlobalProperties(spec, guid, gyp_file_name):
       else:
         properties[0].append(['WindowsTargetPlatformMinVersion',
                               target_platform_version])
-    if spec.get('msvs_enable_winphone'):
+    if spec.get('msvs_enable_winphone') and version.ShortName() != '2015':
       properties[0].append(['ApplicationType', 'Windows Phone'])
     else:
       properties[0].append(['ApplicationType', 'Windows Store'])
 
   return properties
 
-def _GetMSBuildConfigurationDetails(spec, build_file):
+def _GetMSBuildConfigurationDetails(spec, build_file, options, project):
   properties = {}
   for name, settings in spec['configurations'].iteritems():
-    msbuild_attributes = _GetMSBuildAttributes(spec, settings, build_file)
+    msbuild_attributes = _GetMSBuildAttributes(spec, settings, build_file, options, project)
     condition = _GetConfigurationCondition(name, settings)
     character_set = msbuild_attributes.get('CharacterSet')
     _AddConditionalProperty(properties, condition, 'ConfigurationType',
@@ -2749,9 +2822,9 @@ def _GetMSBuildPropertySheets(configurations):
       sheets.append(import_group)
     return sheets
 
-def _ConvertMSVSBuildAttributes(spec, config, build_file):
+def _ConvertMSVSBuildAttributes(spec, config, build_file, options, project):
   config_type = _GetMSVSConfigurationType(spec, build_file)
-  msvs_attributes = _GetMSVSAttributes(spec, config, config_type)
+  msvs_attributes = _GetMSVSAttributes(spec, config, config_type, options, project)
   msbuild_attributes = {}
   for a in msvs_attributes:
     if a in ['IntermediateDirectory', 'OutputDirectory']:
@@ -2789,9 +2862,9 @@ def _ConvertMSVSConfigurationType(config_type):
   return config_type
 
 
-def _GetMSBuildAttributes(spec, config, build_file):
+def _GetMSBuildAttributes(spec, config, build_file, options, project):
   if 'msbuild_configuration_attributes' not in config:
-    msbuild_attributes = _ConvertMSVSBuildAttributes(spec, config, build_file)
+    msbuild_attributes = _ConvertMSVSBuildAttributes(spec, config, build_file, options, project)
 
   else:
     config_type = _GetMSVSConfigurationType(spec, build_file)
@@ -2838,7 +2911,7 @@ def _GetMSBuildAttributes(spec, config, build_file):
   return msbuild_attributes
 
 
-def _GetMSBuildConfigurationGlobalProperties(spec, configurations, build_file):
+def _GetMSBuildConfigurationGlobalProperties(spec, configurations, build_file, options, project):
   # TODO(jeanluc) We could optimize out the following and do it only if
   # there are actions.
   # TODO(jeanluc) Handle the equivalent of setting 'CYGWIN=nontsec'.
@@ -2857,7 +2930,7 @@ def _GetMSBuildConfigurationGlobalProperties(spec, configurations, build_file):
   properties = {}
   for (name, configuration) in sorted(configurations.iteritems()):
     condition = _GetConfigurationCondition(name, configuration)
-    attributes = _GetMSBuildAttributes(spec, configuration, build_file)
+    attributes = _GetMSBuildAttributes(spec, configuration, build_file, options, project)
     msbuild_settings = configuration['finalized_msbuild_settings']
     _AddConditionalProperty(properties, condition, 'IntDir',
                             attributes['IntermediateDirectory'])
@@ -3054,7 +3127,10 @@ def _FinalizeMSBuildSettings(spec, configuration):
   else:
     _ToolAppend(msbuild_settings, 'ClCompile', 'PrecompiledHeader', 'NotUsing')
   # Turn off WinRT compilation
-  _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'false')
+  if spec['type'] == 'executable' and spec.get('msvs_enable_winrt') == '1':
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'true', True)
+  else:
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'false', True)
   # Turn on import libraries if appropriate
   if spec.get('msvs_requires_importlibrary'):
    _ToolAppend(msbuild_settings, '', 'IgnoreImportLibrary', 'false')
@@ -3071,6 +3147,9 @@ def _FinalizeMSBuildSettings(spec, configuration):
   if postbuild:
     _ToolAppend(msbuild_settings, 'PostBuildEvent', 'Command', postbuild)
 
+  # HACK: Temporarily export WINRT until it's in every gyp file.
+  if spec.get('msvs_enable_winrt') == '1':
+    _ToolAppend(msbuild_settings, 'ClCompile', 'PreprocessorDefinitions', ['WINRT'])
 
 def _GetValueFormattedForMSBuild(tool_name, name, value):
   if type(value) == list:
@@ -3129,7 +3208,8 @@ def _GetMSBuildSources(spec, sources, exclusions, rule_dependencies,
                        extension_to_rule_name, actions_spec,
                        sources_handled_by_action, list_excluded):
   groups = ['none', 'masm', 'midl', 'include', 'compile', 'resource', 'rule',
-            'rule_dependency']
+            'rule_dependency', 'xaml_app', 'xaml_page', 'appxmanifest',
+            'image']
   grouped_sources = {}
   for g in groups:
     grouped_sources[g] = []
@@ -3150,6 +3230,7 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
                  rule_dependencies, extension_to_rule_name,
                  sources_handled_by_action,
                  list_excluded):
+
   extensions_excluded_from_precompile = []
   for source in sources:
     if isinstance(source, MSVSProject.Filter):
@@ -3198,9 +3279,48 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
                 detail.append(['PrecompiledHeader', ''])
                 detail.append(['ForcedIncludeFiles', ''])
 
+        # Consume WinRT extensions if necessary
+        if spec.get('msvs_enable_winrt') == '1':
+          basename, extension = os.path.splitext(source)
+          if extension in ['.cc', '.cpp', '.cxx']:
+            detail.append(['CompileAsWinRT', 'true'])
+            detail.append(['ExceptionHandling', 'sync'])
+          #Only Windows Phone (ARM) uses external assembler
+          elif ((spec.get('msvs_enable_winphone') == '1') and ((extension in ['.s', '.S']) or (extension in ['.asm']))):
+            # This is hack for rule for conversion assembler files, to prevent compilation of origin (conversion source)
+            # Prevents multiple custom rules on one file, but only if rule name is convert_asm_For_WP.
+            rule_name = extension_to_rule_name.get(extension)
+            if (not((rule_name != None) and ((rule_name == 'convert_asm_For_WP') or (rule_name == 'gas_preprocessor')))):
+              detail.append(['FileType', 'Document'])
+              detail.append(['CompileAsWinRT', 'false'])
+              detail.append(['ExcludedFromBuild', 'No'])
+              detail.append(['Command', 'armasm -via armasm_ms.config -16 ' + source + ' -o ' + basename + '.obj'])
+              detail.append(['Outputs', basename + '.obj'])
+          else:
+            if ['CompileAsWinRT', 'true'] in detail:
+              detail.remove(['CompileAsWinRT', 'true'])
+            detail.append(['CompileAsWinRT', 'false'])
+
+        # Special attribute for xaml dependent source files.
+        if spec.get('msvs_enable_winrt') == '1':
+          basename, extension = os.path.splitext(source)
+          if source.endswith('.xaml.h') or source.endswith('.xaml.cpp'):
+            detail.append(['DependentUpon', basename])
+
         group, element = _MapFileToMsBuildSourceType(source, rule_dependencies,
-                                                     extension_to_rule_name)
+                                                     extension_to_rule_name, spec)
         grouped_sources[group].append([element, {'Include': source}] + detail)
+
+
+def _GetMSBuildPackageCertificate(spec):
+  packageCertificate = spec.get('msvs_package_certificate')
+  if packageCertificate:
+    group = [['PropertyGroup',
+        ['PackageCertificateKeyFile', packageCertificate.get('KeyFile')],
+        ['PackageCertificateThumbprint', packageCertificate.get('Thumbprint')]]]
+    return group
+  else:
+    return []
 
 
 def _GetMSBuildProjectReferences(project):
@@ -3208,14 +3328,23 @@ def _GetMSBuildProjectReferences(project):
   if project.dependencies:
     group = ['ItemGroup']
     for dependency in project.dependencies:
+      # On WinRT, don't link or depend on utility projects.
+      if project.spec.get('msvs_enable_winrt') == '1' and dependency.spec.get('type') == 'none':
+          continue
       guid = dependency.guid
       project_dir = os.path.split(project.path)[0]
       relative_path = gyp.common.RelativePath(dependency.path, project_dir)
       project_ref = ['ProjectReference',
           {'Include': relative_path},
-          ['Project', guid],
-          ['ReferenceOutputAssembly', 'false']
+          ['Project', guid]
           ]
+      # Special handling of WinRT DLLs
+      if project.spec.get('msvs_enable_winrt') == '1' and dependency.spec.get('type') == 'shared_library':
+          project_ref.append(['ReferenceOutputAssembly', 'true'])
+          project_ref.append(['UseLibraryDependencyInputs', 'false'])
+      else:
+          project_ref.append(['ReferenceOutputAssembly', 'false'])
+
       for config in dependency.spec.get('configurations', {}).itervalues():
         # If it's disabled in any config, turn it off in the reference.
         if config.get('msvs_2010_disable_uldi_when_referenced', 0):
@@ -3279,7 +3408,7 @@ def _GenerateMSBuildProject(project, options, version, generator_flags):
 
   _GenerateMSBuildFiltersFile(project.path + '.filters', sources,
                               rule_dependencies,
-                              extension_to_rule_name)
+                              extension_to_rule_name, spec)
   missing_sources = _VerifySourcesExist(sources, project_dir)
 
   for configuration in configurations.itervalues():
@@ -3309,10 +3438,10 @@ def _GenerateMSBuildProject(project, options, version, generator_flags):
       }]
 
   content += _GetMSBuildProjectConfigurations(configurations)
-  content += _GetMSBuildGlobalProperties(spec, project.guid, project_file_name)
+  content += _GetMSBuildGlobalProperties(spec, project.guid, project_file_name, version)
   content += import_default_section
-  content += _GetMSBuildConfigurationDetails(spec, project.build_file)
-  if spec.get('msvs_enable_winphone'):
+  content += _GetMSBuildConfigurationDetails(spec, project.build_file, options, project)
+  if spec.get('msvs_enable_winphone') == '1' and version.ShortName() != '2015':
    content += _GetMSBuildLocalProperties('v120_wp81')
   else:
    content += _GetMSBuildLocalProperties(project.msbuild_toolset)
@@ -3322,11 +3451,12 @@ def _GenerateMSBuildProject(project, options, version, generator_flags):
   content += _GetMSBuildPropertySheets(configurations)
   content += macro_section
   content += _GetMSBuildConfigurationGlobalProperties(spec, configurations,
-                                                      project.build_file)
+                                                      project.build_file, options, project)
   content += _GetMSBuildToolSettingsSections(spec, configurations)
   content += _GetMSBuildSources(
       spec, sources, exclusions, rule_dependencies, extension_to_rule_name,
       actions_spec, sources_handled_by_action, list_excluded)
+  content += _GetMSBuildPackageCertificate(spec)
   content += _GetMSBuildProjectReferences(project)
   content += import_cpp_targets_section
   content += import_masm_targets_section
@@ -3460,8 +3590,29 @@ def _AddMSBuildAction(spec, primary_input, inputs, outputs, cmd, description,
       [['FileType', 'Document'],
        ['Command', command],
        ['Message', description],
-       ['Outputs', outputs]
+       ['Outputs', outputs],
       ])
+
+  package = spec.get('forcePackage')
+  setContent=False
+  #check if action should be part of package
+  if primary_input.endswith('.png'):
+    #all images are packaged by default
+    setContent=True
+  elif package is not None:
+    setContent = os.path.normpath(primary_input) in (os.path.normpath(p) for p in package)
+
+  #set Content property if needed
+  if setContent:
+    action_spec.extend([
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Debug|Win32\''}, 'true'],
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Release|Win32\''}, 'true'],
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Debug|ARM\''}, 'true'],
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Release|ARM\''}, 'true'],
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Debug|x64\''}, 'true'],
+      ['DeploymentContent', {'Condition': '\'$(Configuration)|$(Platform)\'==\'Release|x64\''}, 'true'],
+    ])
+
   if additional_inputs:
     action_spec.append(['AdditionalInputs', additional_inputs])
   actions_spec.append(action_spec)

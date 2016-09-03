@@ -407,6 +407,12 @@ class MsvsSettings(object):
     else:
       return None
 
+  def IsStoreApp(self, config):
+    """Gets whether the app is targetting the store."""
+    config = self._TargetConfig(config)
+    linkAsWinRT = self._Setting(('VCLinkerTool', 'LinkAsWinRT'), config)
+    return linkAsWinRT == 'true'
+
   def GetNoImportLibrary(self, config):
     """If NoImportLibrary: true, ninja will not expect the output to include
     an import library."""
@@ -497,7 +503,11 @@ class MsvsSettings(object):
   def GetCflagsCC(self, config):
     """Returns the flags that need to be added to .cc compilations."""
     config = self._TargetConfig(config)
-    return ['/TP'] + self._GetPchFlags(config, '.cc')
+    cflags = []
+    cl = self._GetWrapper(self, self.msvs_settings[config],
+                          'VCCLCompilerTool', append=cflags)
+    cl('CompileAsWinRT', map={'true': '/ZW'})
+    return cflags + ['/TP'] + self._GetPchFlags(config, '.cc')
 
   def _GetAdditionalLibraryDirectories(self, root, config, gyp_to_build_path):
     """Get and normalize the list of paths in AdditionalLibraryDirectories
@@ -563,6 +573,7 @@ class MsvsSettings(object):
                           'VCLinkerTool', append=ldflags)
     self._GetDefFileAsLdflags(ldflags, gyp_to_build_path)
     ld('GenerateDebugInformation', map={'true': '/DEBUG'})
+
     ld('TargetMachine', map={'1': 'X86', '17': 'X64', '3': 'ARM'},
        prefix='/MACHINE:')
     ldflags.extend(self._GetAdditionalLibraryDirectories(
@@ -593,6 +604,8 @@ class MsvsSettings(object):
        map={'1': 'CONSOLE%s' % minimum_required_version,
             '2': 'WINDOWS%s' % minimum_required_version},
        prefix='/SUBSYSTEM:')
+
+    ld('LinkAsWinRT', map={'true': '/APPCONTAINER'})
 
     stack_reserve_size = self._Setting(
         ('VCLinkerTool', 'StackReserveSize'), config, default='')
@@ -1045,6 +1058,14 @@ def GenerateEnvironmentFiles(toplevel_build_dir, generator_flags,
 
     env_block = _FormatAsEnvironmentBlock(env)
     f = open_out(os.path.join(toplevel_build_dir, 'environment.' + arch), 'wb')
+    f.write(env_block)
+    f.close()
+
+    # Create a store app version of the environment.
+    env['LIB']     = env['LIB']    .replace(r'\VC\LIB', r'\VC\LIB\STORE')
+    env['LIBPATH'] = env['LIBPATH'].replace(r'\VC\LIB', r'\VC\LIB\STORE')
+    env_block = _FormatAsEnvironmentBlock(env)
+    f = open_out(os.path.join(toplevel_build_dir, 'environment.' + arch + 'app'), 'wb')
     f.write(env_block)
     f.close()
 

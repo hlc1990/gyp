@@ -272,7 +272,8 @@ class MSVSSolution(object):
           f.write('\tEndProjectSection\r\n')
 
       if isinstance(e, MSVSProject):
-        if e.dependencies:
+        # WinRT uses project references instead of dependencies.
+        if e.dependencies and not e.spec.get('msvs_enable_winrt'):
           f.write('\tProjectSection(ProjectDependencies) = postProject\r\n')
           for d in e.dependencies:
             f.write('\t\t%s = %s\r\n' % (d.get_guid(), d.get_guid()))
@@ -292,10 +293,14 @@ class MSVSSolution(object):
     # Sort config guids for easier diffing of solution changes.
     config_guids = []
     config_guids_overrides = {}
+    deploy_guids = []
     for e in all_entries:
       if isinstance(e, MSVSProject):
         config_guids.append(e.get_guid())
         config_guids_overrides[e.get_guid()] = e.config_platform_overrides
+        # Mark executables on WinRT as deployable in the configuration manager.
+        if e.spec.get('msvs_enable_winrt') and e.spec.get('type') == 'executable':
+            deploy_guids.append(e.get_guid())
     config_guids.sort()
 
     f.write('\tGlobalSection(ProjectConfigurationPlatforms) = postSolution\r\n')
@@ -316,6 +321,14 @@ class MSVSSolution(object):
             v,              # Solution build configuration
             nv,             # Project build config for that solution config
         ))
+
+        if g in deploy_guids:
+          # Deploy in configuration manager.
+          f.write('\t\t%s.%s.Deploy.0 = %s\r\n' % (
+              g,              # Project GUID
+              v,              # Solution build configuration
+              nv,             # Project build config for that solution config
+          ))
     f.write('\tEndGlobalSection\r\n')
 
     # TODO(rspangler): Should be able to configure this stuff too (though I've

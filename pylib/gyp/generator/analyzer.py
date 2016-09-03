@@ -577,7 +577,7 @@ def CalculateVariables(default_variables, params):
   flavor = gyp.common.GetFlavor(params)
   if flavor == 'mac':
     default_variables.setdefault('OS', 'mac')
-  elif flavor == 'win':
+  elif flavor == 'win' or flavor == 'winrt':
     default_variables.setdefault('OS', 'win')
     # Copy additional generator configuration data from VS, which is shared
     # by the Windows Ninja generator.

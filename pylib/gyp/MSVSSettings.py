@@ -716,6 +716,7 @@ _MSBuildOnly(_compile, 'ProcessorNumber', _integer)  # the number of processors
 _MSBuildOnly(_compile, 'TrackerLogDirectory', _folder_name)
 _MSBuildOnly(_compile, 'TreatSpecificWarningsAsErrors', _string_list)  # /we
 _MSBuildOnly(_compile, 'UseUnicodeForAssemblerListing', _boolean)  # /FAu
+_MSBuildOnly(_compile, 'CompileAsWinRT', _boolean) # /ZW
 
 # Defines a setting that needs very customized processing
 _CustomGeneratePreprocessedFile(_compile, 'GeneratePreprocessedFile')
@@ -784,6 +785,7 @@ _Same(_link, 'LargeAddressAware', _newly_boolean)  # /LARGEADDRESSAWARE
 _Same(_link, 'OptimizeReferences', _newly_boolean)  # /OPT:REF
 _Same(_link, 'RandomizedBaseAddress', _newly_boolean)  # /DYNAMICBASE
 _Same(_link, 'TerminalServerAware', _newly_boolean)  # /TSAWARE
+_Same(_link, 'WindowsMetadataFile', _string)  # /WINMDFILE
 
 _subsystem_enumeration = _Enumeration(
     ['NotSet',
@@ -910,6 +912,7 @@ _MSBuildOnly(_link, 'CLRSupportLastError',
                                    'Disabled',  # /CLRSupportLastError:NO
                                    # /CLRSupportLastError:SYSTEMDLL
                                    'SystemDlls']))
+_MSBuildOnly(_link, 'LinkAsWinRT', _boolean) # /APPCONTAINER
 
 
 # Directives for converting VCResourceCompilerTool to ResourceCompile.

@@ -50,6 +50,7 @@ base_path_sections = [
   'libraries',
   'outputs',
   'sources',
+  'forcePackage',
 ]
 path_sections = set()
 
@@ -103,12 +104,14 @@ base_non_configuration_keys = [
   'rules',
   'run_as',
   'sources',
+  'forcePackage',
   'standalone_static_library',
   'suppress_wildcard',
   'target_name',
   'toolset',
   'toolsets',
   'type',
+  'appx',
 
   # Sections that can be found inside targets or configurations, but that
   # should not be propagated from targets into their configurations.
@@ -126,6 +129,7 @@ invalid_configuration_keys = [
   'libraries',
   'link_settings',
   'sources',
+  'forcePackage',
   'standalone_static_library',
   'target_name',
   'type',

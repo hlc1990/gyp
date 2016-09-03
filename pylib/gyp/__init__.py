@@ -346,6 +346,11 @@ def gyp_main(args):
                     action='append', metavar='TARGET',
                     help='include only TARGET and its deep dependencies')
 
+  parser.add_option('-M', '--multiple-platforms', dest='multiple_platforms',
+                    action='append', default=[],
+                    help='Generate projects for multiple winrt platforms at the same time. Difference will be seen '
+                         'in projects names')
+
   options, build_files_arg = parser.parse_args(args)
   build_files = build_files_arg
 
@@ -496,38 +501,66 @@ def gyp_main(args):
   # Generate all requested formats (use a set in case we got one format request
   # twice)
   for format in set(options.formats):
-    params = {'options': options,
-              'build_files': build_files,
-              'generator_flags': generator_flags,
-              'cwd': os.getcwd(),
-              'build_files_arg': build_files_arg,
-              'gyp_binary': sys.argv[0],
-              'home_dot_gyp': home_dot_gyp,
-              'parallel': options.parallel,
-              'root_targets': options.root_targets,
-              'target_arch': cmdline_default_variables.get('target_arch', '')}
+    platforms = []
+    if not options.defines:
+      options.defines = []
+    if format == 'msvs-winrt' and options.multiple_platforms:
+      platforms.extend(options.multiple_platforms)
+    elif options.multiple_platforms:
+      print >> sys.stdout, '-M and --multiple-platforms options can be used only when gyp generators is msvs-winrt'
+    else:
+      platforms.append('')
 
-    # Start with the default variables from the command line.
-    [generator, flat_list, targets, data] = Load(
-        build_files, format, cmdline_default_variables, includes, options.depth,
-        params, options.check, options.circular_check,
-        options.duplicate_basename_check)
+    for platform in platforms:
+      currentDefine = ''
+      if platform != '':
+        currentDefine = 'winrt_platform=' + platform
+        options.suffix = '_' + platform
+        options.outputDirSuffix = '_' + platform
+        options.defines.append(currentDefine)
+        defines.append(currentDefine)
+        cmdline_default_variables['winrt_platform'] = platform
+        print  >> sys.stdout, "Winrt platform: " + platform
 
-    # TODO(mark): Pass |data| for now because the generator needs a list of
-    # build files that came in.  In the future, maybe it should just accept
-    # a list, and not the whole data dict.
-    # NOTE: flat_list is the flattened dependency graph specifying the order
-    # that targets may be built.  Build systems that operate serially or that
-    # need to have dependencies defined before dependents reference them should
-    # generate targets in the order specified in flat_list.
-    generator.GenerateOutput(flat_list, targets, data, params)
+      params = {'options': options,
+                'build_files': build_files,
+                'generator_flags': generator_flags,
+                'cwd': os.getcwd(),
+                'build_files_arg': build_files_arg,
+                'gyp_binary': sys.argv[0],
+                'home_dot_gyp': home_dot_gyp,
+                'parallel': options.parallel,
+                'root_targets': options.root_targets,
+                'target_arch': cmdline_default_variables.get('target_arch', '')}
 
-    if options.configs:
-      valid_configs = targets[flat_list[0]]['configurations'].keys()
-      for conf in options.configs:
-        if conf not in valid_configs:
-          raise GypError('Invalid config specified via --build: %s' % conf)
-      generator.PerformBuild(data, options.configs, params)
+      # Start with the default variables from the command line.
+      [generator, flat_list, targets, data] = Load(
+          build_files, format, cmdline_default_variables, includes, options.depth,
+          params, options.check, options.circular_check,
+          options.duplicate_basename_check)
+
+      # TODO(mark): Pass |data| for now because the generator needs a list of
+      # build files that came in.  In the future, maybe it should just accept
+      # a list, and not the whole data dict.
+      # NOTE: flat_list is the flattened dependency graph specifying the order
+      # that targets may be built.  Build systems that operate serially or that
+      # need to have dependencies defined before dependents reference them should
+      # generate targets in the order specified in flat_list.
+      generator.GenerateOutput(flat_list, targets, data, params)
+
+      if options.configs:
+        valid_configs = targets[flat_list[0]]['configurations'].keys()
+        for conf in options.configs:
+          if conf not in valid_configs:
+            raise GypError('Invalid config specified via --build: %s' % conf)
+        generator.PerformBuild(data, options.configs, params)
+
+      if currentDefine in defines:
+        defines.remove(currentDefine)
+      if currentDefine in options.defines:
+        options.defines.remove(currentDefine)
+      if cmdline_default_variables.has_key('winrt_platform'):
+        cmdline_default_variables.pop('winrt_platform')
 
   # Done
   return 0

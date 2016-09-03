@@ -442,7 +442,8 @@ def CopyTool(flavor, out_path):
       'aix': 'flock',
       'solaris': 'flock',
       'mac': 'mac',
-      'win': 'win'
+      'win': 'win',
+      'winrt': 'win',
       }.get(flavor, None)
   if not prefix:
     return

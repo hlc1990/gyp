@@ -77,36 +77,37 @@ class VisualStudioVersion(object):
     # this is set by running vcvarsall.bat.
     assert target_arch in ('x86', 'x64')
     sdk_dir = os.environ.get('WindowsSDKDir')
-    if sdk_dir:
-      setup_path = os.path.normpath(os.path.join(sdk_dir, 'Bin/SetEnv.Cmd'))
-    if self.sdk_based and sdk_dir and os.path.exists(setup_path):
-      return [setup_path, '/' + target_arch]
+    if self.sdk_based and sdk_dir:
+      setupScript = os.path.normpath(os.path.join(sdk_dir, 'Bin/SetEnv.Cmd'))
+      #Bin/SetEnv.cmd script is missing in W10 and W8.1 SDKs
+      if os.path.isfile(setupScript):
+        return [setupScript, '/' + target_arch]
+
+    # We don't use VC/vcvarsall.bat for x86 because vcvarsall calls
+    # vcvars32, which it can only find if VS??COMNTOOLS is set, which it
+    # isn't always.
+    if target_arch == 'x86':
+      if self.short_name >= '2013' and self.short_name[-1] != 'e' and (
+          os.environ.get('PROCESSOR_ARCHITECTURE') == 'AMD64' or
+          os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64'):
+        # VS2013 and later, non-Express have a x64-x86 cross that we want
+        # to prefer.
+        return [os.path.normpath(
+           os.path.join(self.path, 'VC/vcvarsall.bat')), 'amd64_x86']
+      # Otherwise, the standard x86 compiler.
+      return [os.path.normpath(
+        os.path.join(self.path, 'Common7/Tools/vsvars32.bat'))]
     else:
-      # We don't use VC/vcvarsall.bat for x86 because vcvarsall calls
-      # vcvars32, which it can only find if VS??COMNTOOLS is set, which it
-      # isn't always.
-      if target_arch == 'x86':
-        if self.short_name >= '2013' and self.short_name[-1] != 'e' and (
-            os.environ.get('PROCESSOR_ARCHITECTURE') == 'AMD64' or
-            os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64'):
-          # VS2013 and later, non-Express have a x64-x86 cross that we want
-          # to prefer.
-          return [os.path.normpath(
-             os.path.join(self.path, 'VC/vcvarsall.bat')), 'amd64_x86']
-        # Otherwise, the standard x86 compiler.
-        return [os.path.normpath(
-          os.path.join(self.path, 'Common7/Tools/vsvars32.bat'))]
-      else:
-        assert target_arch == 'x64'
-        arg = 'x86_amd64'
-        # Use the 64-on-64 compiler if we're not using an express
-        # edition and we're running on a 64bit OS.
-        if self.short_name[-1] != 'e' and (
-            os.environ.get('PROCESSOR_ARCHITECTURE') == 'AMD64' or
-            os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64'):
-          arg = 'amd64'
-        return [os.path.normpath(
-            os.path.join(self.path, 'VC/vcvarsall.bat')), arg]
+      assert target_arch == 'x64'
+      arg = 'x86_amd64'
+      # Use the 64-on-64 compiler if we're not using an express
+      # edition and we're running on a 64bit OS.
+      if self.short_name[-1] != 'e' and (
+          os.environ.get('PROCESSOR_ARCHITECTURE') == 'AMD64' or
+          os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64'):
+        arg = 'amd64'
+      return [os.path.normpath(
+          os.path.join(self.path, 'VC/vcvarsall.bat')), arg]
 
 
 def _RegistryQueryBase(sysdir, key, value):

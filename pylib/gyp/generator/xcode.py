@@ -56,6 +56,7 @@ generator_default_variables = {
   'RULE_INPUT_DIRNAME': '$(INPUT_FILE_DIRNAME)',
   'SHARED_INTERMEDIATE_DIR': '$(%s)' % _shared_intermediate_var,
   'CONFIGURATION_NAME': '$(CONFIGURATION)',
+  'OS_RUNTIME': '',
 }
 
 # The Xcode-specific sections that hold paths.
