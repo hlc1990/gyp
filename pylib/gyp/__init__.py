@@ -525,8 +525,8 @@ def gyp_main(args):
 	    if targetArchitecture == '':
 	      targetArchitecture = 'x86'
 	      print >> sys.stdout, "targetArchitecture: " + targetArchitecture
-	    options.suffix = '_' + platform + targetArchitecture
-	    options.outputDirSuffix = '_' + platform + targetArchitecture
+	    options.suffix = '_' + platform + '_' + targetArchitecture
+	    options.outputDirSuffix = '_' + platform + '_' + targetArchitecture
 	  else:
 	    options.suffix = '_' + platform
             options.outputDirSuffix = '_' + platform
