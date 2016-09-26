@@ -503,7 +503,7 @@ def gyp_main(args):
   for format in set(options.formats):
     platforms = []
     targetArchitecture = cmdline_default_variables.get('target_arch', '')
-    print >> sys.stdout, "targetArchitecture: " + targetArchitecture
+    #print >> sys.stdout, "targetArchitecture: " + targetArchitecture
     if not options.defines:
       options.defines = []
     if format == 'msvs-winrt' and options.multiple_platforms:
@@ -512,7 +512,7 @@ def gyp_main(args):
       print >> sys.stdout, '-M and --multiple-platforms options can be used only when gyp generators is msvs-winrt'
     else:
       if format == 'msvs-winrt':
-        platforms.append(cmdline_default_variables.get('winrt_platform', 'Bruka'))
+        platforms.append(cmdline_default_variables.get('winrt_platform', ''))
       else:
         platforms.append('')
 
@@ -524,10 +524,13 @@ def gyp_main(args):
 	  if platform == 'win10':
 	    if targetArchitecture == '':
 	      targetArchitecture = 'x86'
-	      print >> sys.stdout, "targetArchitecture: " + targetArchitecture
+	    print >> sys.stdout, "CPU platform: " + targetArchitecture
 	    options.suffix = '_' + platform + '_' + targetArchitecture
 	    options.outputDirSuffix = '_' + platform + '_' + targetArchitecture
 	  else:
+	    if platform == 'win10_arm':
+	      targetArchitecture = 'arm'
+	      print >> sys.stdout, "CPU platform: " + targetArchitecture
 	    options.suffix = '_' + platform
             options.outputDirSuffix = '_' + platform
         options.defines.append(currentDefine)
