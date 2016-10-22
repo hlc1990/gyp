@@ -1613,6 +1613,7 @@ def _AddToolFilesToMSVS(p, spec):
   for f in tool_files:
     p.AddToolFile(f)
 
+
 def _HandlePreCompiledHeaders(p, sources, spec):
   # Pre-compiled header source stubs need a different compiler flag
   # (generate precompiled header) and any source file not of the same
@@ -1972,6 +1973,7 @@ def PerformBuild(data, configurations, params):
     arguments = [devenv, sln_path, '/Build', config]
     print 'Building [%s]: %s' % (config, arguments)
     rtn = subprocess.check_call(arguments)
+
 
 def CalculateGeneratorInputInfo(params):
   if params.get('flavor') == 'ninja':
@@ -3262,7 +3264,6 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
                  rule_dependencies, extension_to_rule_name,
                  sources_handled_by_action,
                  list_excluded):
-
   extensions_excluded_from_precompile = []
   for source in sources:
     if isinstance(source, MSVSProject.Filter):
