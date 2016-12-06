@@ -2036,8 +2036,8 @@ def GenerateOutput(target_list, target_dicts, data, params):
   for project in project_objects.values():
     fixpath_prefix = project.fixpath_prefix
     # HACK: Temporarily force WinRT in projects until condition for OS_RUNTIME='WINRT' is in every gyp file.
-    # Exception: the "protoc" project
-    if params.get('flavor') == 'winrt' and project.name != "protoc":
+    # Exception: the "protoc" and "protoc_lib" projects
+    if params.get('flavor') == 'winrt' and project.name != "protoc" and project.name != "protoc_lib":
         project.spec['msvs_enable_winrt'] = '1'
     missing_sources.extend(_GenerateProject(project, options, msvs_version,
                                             generator_flags))
