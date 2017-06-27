@@ -83,7 +83,7 @@ generator_additional_non_configuration_keys = [
     'msvs_external_builder_build_cmd',
     'msvs_external_builder_clean_cmd',
     'msvs_external_builder_clcompile_cmd',
-    'msvs_enable_winrt',
+    'msvs_enable_winuwp',
     'msvs_requires_importlibrary',
     'msvs_enable_winphone',
     'msvs_package_certificate',
@@ -258,7 +258,7 @@ def _ToolSetOrAppend(tools, tool_name, setting, value, only_if_unset=False):
   if not tools.get(tool_name):
     tools[tool_name] = dict()
   tool = tools[tool_name]
-  if 'CompileAsWinRT' == setting:
+  if 'CompileAsWinUWP' == setting:
     return
   if tool.get(setting):
     if only_if_unset: return
@@ -1950,8 +1950,8 @@ def CalculateVariables(default_variables, params):
 
   print >> sys.stdout, "Flavor: " + gyp.common.GetFlavor(params)
 
-  if gyp.common.GetFlavor(params) == 'winrt':
-    default_variables['OS_RUNTIME'] = 'winrt'
+  if gyp.common.GetFlavor(params) == 'winuwp':
+    default_variables['OS_RUNTIME'] = 'winuwp'
   else:
     default_variables['OS_RUNTIME'] = 'win32'
 
@@ -2035,10 +2035,10 @@ def GenerateOutput(target_list, target_dicts, data, params):
   missing_sources = []
   for project in project_objects.values():
     fixpath_prefix = project.fixpath_prefix
-    # HACK: Temporarily force WinRT in projects until condition for OS_RUNTIME='WINRT' is in every gyp file.
+    # HACK: Temporarily force WinUWP in projects until condition for OS_RUNTIME='WINUWP' is in every gyp file.
     # Exception: the "protoc" and "protoc_lib" projects
-    if params.get('flavor') == 'winrt' and project.name != "protoc" and project.name != "protoc_lib":
-        project.spec['msvs_enable_winrt'] = '1'
+    if params.get('flavor') == 'winuwp' and project.name != "protoc" and project.name != "protoc_lib":
+        project.spec['msvs_enable_winuwp'] = '1'
     missing_sources.extend(_GenerateProject(project, options, msvs_version,
                                             generator_flags))
   fixpath_prefix = None
@@ -2739,7 +2739,7 @@ def _GetMSBuildGlobalProperties(spec, guid, gyp_file_name, version):
      os.environ.get('PROCESSOR_ARCHITEW6432') == 'AMD64':
     properties[0].append(['PreferredToolArchitecture', 'x64'])
 
-  if spec.get('msvs_enable_winrt') == '1':
+  if spec.get('msvs_enable_winuwp') == '1':
     properties[0].append(['DefaultLanguage', 'en-US'])
     properties[0].append(['AppContainerApplication', 'true'])
     if spec.get('msvs_application_type_revision'):
@@ -2794,7 +2794,7 @@ def _GetMSBuildConfigurationDetails(spec, build_file, options, project):
     _AddConditionalProperty(properties, condition, 'ConfigurationType',
                             msbuild_attributes['ConfigurationType'])
     if character_set:
-      if 'msvs_enable_winrt' not in spec :
+      if 'msvs_enable_winuwp' not in spec :
         _AddConditionalProperty(properties, condition, 'CharacterSet',
                                 character_set)
   return _GetMSBuildPropertyGroup(spec, 'Configuration', properties)
@@ -3160,11 +3160,11 @@ def _FinalizeMSBuildSettings(spec, configuration):
                 'ForcedIncludeFiles', [precompiled_header])
   else:
     _ToolAppend(msbuild_settings, 'ClCompile', 'PrecompiledHeader', 'NotUsing')
-  # Turn off WinRT compilation
-  if spec['type'] == 'executable' and spec.get('msvs_enable_winrt') == '1':
-    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'true', True)
+  # Turn off WinUWP compilation
+  if spec['type'] == 'executable' and spec.get('msvs_enable_winuwp') == '1':
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinUWP', 'true', True)
   else:
-    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'false', True)
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinUWP', 'false', True)
   # Turn on import libraries if appropriate
   if spec.get('msvs_requires_importlibrary'):
    _ToolAppend(msbuild_settings, '', 'IgnoreImportLibrary', 'false')
@@ -3181,9 +3181,9 @@ def _FinalizeMSBuildSettings(spec, configuration):
   if postbuild:
     _ToolAppend(msbuild_settings, 'PostBuildEvent', 'Command', postbuild)
 
-  # HACK: Temporarily export WINRT until it's in every gyp file.
-  if spec.get('msvs_enable_winrt') == '1':
-    _ToolAppend(msbuild_settings, 'ClCompile', 'PreprocessorDefinitions', ['WINRT'])
+  # HACK: Temporarily export WINUWP until it's in every gyp file.
+  if spec.get('msvs_enable_winuwp') == '1':
+    _ToolAppend(msbuild_settings, 'ClCompile', 'PreprocessorDefinitions', ['WINUWP'])
 
 def _GetValueFormattedForMSBuild(tool_name, name, value):
   if type(value) == list:
@@ -3312,11 +3312,11 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
                 detail.append(['PrecompiledHeader', ''])
                 detail.append(['ForcedIncludeFiles', ''])
 
-        # Consume WinRT extensions if necessary
-        if spec.get('msvs_enable_winrt') == '1':
+        # Consume WinUWP extensions if necessary
+        if spec.get('msvs_enable_winuwp') == '1':
           basename, extension = os.path.splitext(source)
           if extension in ['.cc', '.cpp', '.cxx']:
-            detail.append(['CompileAsWinRT', 'true'])
+            detail.append(['CompileAsWinUWP', 'true'])
             detail.append(['ExceptionHandling', 'sync'])
           #Only Windows Phone (ARM) uses external assembler
           elif ((spec.get('msvs_enable_winphone') == '1') and ((extension in ['.s', '.S']) or (extension in ['.asm']))):
@@ -3325,17 +3325,17 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
             rule_name = extension_to_rule_name.get(extension)
             if (not((rule_name != None) and ((rule_name == 'convert_asm_For_WP') or (rule_name == 'gas_preprocessor')))):
               detail.append(['FileType', 'Document'])
-              detail.append(['CompileAsWinRT', 'false'])
+              detail.append(['CompileAsWinUWP', 'false'])
               detail.append(['ExcludedFromBuild', 'No'])
               detail.append(['Command', 'armasm -via armasm_ms.config -16 ' + source + ' -o ' + basename + '.obj'])
               detail.append(['Outputs', basename + '.obj'])
           else:
-            if ['CompileAsWinRT', 'true'] in detail:
-              detail.remove(['CompileAsWinRT', 'true'])
-            detail.append(['CompileAsWinRT', 'false'])
+            if ['CompileAsWinUWP', 'true'] in detail:
+              detail.remove(['CompileAsWinUWP', 'true'])
+            detail.append(['CompileAsWinUWP', 'false'])
 
         # Special attribute for xaml dependent source files.
-        if spec.get('msvs_enable_winrt') == '1':
+        if spec.get('msvs_enable_winuwp') == '1':
           basename, extension = os.path.splitext(source)
           if source.endswith('.xaml.h') or source.endswith('.xaml.cpp'):
             detail.append(['DependentUpon', basename])
@@ -3361,8 +3361,8 @@ def _GetMSBuildProjectReferences(project):
   if project.dependencies:
     group = ['ItemGroup']
     for dependency in project.dependencies:
-      # On WinRT, don't link or depend on utility projects.
-      if project.spec.get('msvs_enable_winrt') == '1' and dependency.spec.get('type') == 'none':
+      # On WinUWP, don't link or depend on utility projects.
+      if project.spec.get('msvs_enable_winuwp') == '1' and dependency.spec.get('type') == 'none':
           continue
       guid = dependency.guid
       project_dir = os.path.split(project.path)[0]
@@ -3371,8 +3371,8 @@ def _GetMSBuildProjectReferences(project):
           {'Include': relative_path},
           ['Project', guid]
           ]
-      # Special handling of WinRT DLLs
-      if project.spec.get('msvs_enable_winrt') == '1' and dependency.spec.get('type') == 'shared_library':
+      # Special handling of WinUWP DLLs
+      if project.spec.get('msvs_enable_winuwp') == '1' and dependency.spec.get('type') == 'shared_library':
           project_ref.append(['ReferenceOutputAssembly', 'true'])
           project_ref.append(['UseLibraryDependencyInputs', 'false'])
       else:

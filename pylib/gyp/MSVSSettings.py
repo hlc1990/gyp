@@ -592,7 +592,7 @@ _Same(_compile, 'UndefinePreprocessorDefinitions', _string_list)  # /U
 _Same(_compile, 'UseFullPaths', _boolean)  # /FC
 _Same(_compile, 'WholeProgramOptimization', _boolean)  # /GL
 _Same(_compile, 'XMLDocumentationFileName', _file_name)
-_Same(_compile, 'CompileAsWinRT', _boolean)  # /ZW
+_Same(_compile, 'CompileAsWinUWP', _boolean)  # /ZW
 
 _Same(_compile, 'AssemblerOutput',
       _Enumeration(['NoListing',
@@ -717,7 +717,7 @@ _MSBuildOnly(_compile, 'ProcessorNumber', _integer)  # the number of processors
 _MSBuildOnly(_compile, 'TrackerLogDirectory', _folder_name)
 _MSBuildOnly(_compile, 'TreatSpecificWarningsAsErrors', _string_list)  # /we
 _MSBuildOnly(_compile, 'UseUnicodeForAssemblerListing', _boolean)  # /FAu
-_MSBuildOnly(_compile, 'CompileAsWinRT', _boolean) # /ZW
+_MSBuildOnly(_compile, 'CompileAsWinUWP', _boolean) # /ZW
 
 # Defines a setting that needs very customized processing
 _CustomGeneratePreprocessedFile(_compile, 'GeneratePreprocessedFile')
@@ -913,7 +913,7 @@ _MSBuildOnly(_link, 'CLRSupportLastError',
                                    'Disabled',  # /CLRSupportLastError:NO
                                    # /CLRSupportLastError:SYSTEMDLL
                                    'SystemDlls']))
-_MSBuildOnly(_link, 'LinkAsWinRT', _boolean) # /APPCONTAINER
+_MSBuildOnly(_link, 'LinkAsWinUWP', _boolean) # /APPCONTAINER
 
 
 # Directives for converting VCResourceCompilerTool to ResourceCompile.

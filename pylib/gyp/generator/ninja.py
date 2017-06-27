@@ -77,7 +77,7 @@ def QuoteShellArgument(arg, flavor):
   # whitelist common OK ones and quote anything else.
   if re.match(r'^[a-zA-Z0-9_=.\\/-]+$', arg):
     return arg  # No quoting necessary.
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     return gyp.msvs_emulation.QuoteForRspFile(arg)
   return "'" + arg.replace("'", "'" + '"\'"' + "'")  + "'"
 
@@ -85,7 +85,7 @@ def QuoteShellArgument(arg, flavor):
 def Define(d, flavor):
   """Takes a preprocessor define and returns a -D parameter that's ninja- and
   shell-escaped."""
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     # cl.exe replaces literal # characters with = in preprocesor definitions for
     # some reason. Octal-encode to work around that.
     d = d.replace('#', '\\%03o' % ord('#'))
@@ -159,7 +159,7 @@ class Target(object):
     # For bundles, the .TOC should be produced for the binary, not for
     # FinalOutput(). But the naive approach would put the TOC file into the
     # bundle, so don't do this for bundles for now.
-    if flavor == 'win' or flavor == 'winrt' or self.bundle:
+    if flavor == 'win' or flavor == 'winuwp' or self.bundle:
       return False
     return self.type in ('shared_library', 'loadable_module')
 
@@ -229,8 +229,8 @@ class NinjaWriter(object):
     if toplevel_dir is not None:
       self.abs_build_dir = os.path.abspath(os.path.join(toplevel_dir,
                                                         build_dir))
-    self.obj_ext = '.obj' if flavor == 'win' or flavor == 'winrt' else '.o'
-    if flavor == 'win' or flavor == 'winrt':
+    self.obj_ext = '.obj' if flavor == 'win' or flavor == 'winuwp' else '.o'
+    if flavor == 'win' or flavor == 'winuwp':
       # See docstring of msvs_emulation.GenerateEnvironmentFiles().
       self.win_env = {}
       for arch in ('x86', 'x64'):
@@ -274,7 +274,7 @@ class NinjaWriter(object):
     return path
 
   def ExpandRuleVariables(self, path, root, dirname, source, ext, name):
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       path = self.msvs_settings.ConvertVSMacros(
           path, config=self.config_name)
     path = path.replace(generator_default_variables['RULE_INPUT_ROOT'], root)
@@ -293,11 +293,11 @@ class NinjaWriter(object):
     if env:
       if self.flavor == 'mac':
         path = gyp.xcode_emulation.ExpandEnvVars(path, env)
-      elif self.flavor == 'win' or self.flavor == 'winrt':
+      elif self.flavor == 'win' or self.flavor == 'winuwp':
         path = gyp.msvs_emulation.ExpandMacros(path, env)
     if path.startswith('$!'):
       expanded = self.ExpandSpecial(path)
-      if self.flavor == 'win' or self.flavor == 'winrt':
+      if self.flavor == 'win' or self.flavor == 'winuwp':
         expanded = os.path.normpath(expanded)
       return expanded
     if '$|' in path:
@@ -389,11 +389,11 @@ class NinjaWriter(object):
       if mac_toolchain_dir:
         self.xcode_settings.mac_toolchain_dir = mac_toolchain_dir
 
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       self.msvs_settings = gyp.msvs_emulation.MsvsSettings(spec,
                                                            generator_flags)
       arch = self.msvs_settings.GetArch(config_name)
-      # Hack for WinRT Store Apps, need to use the app environment.
+      # Hack for WinUWP Store Apps, need to use the app environment.
       storeApp = self.msvs_settings.IsStoreApp(config_name)
       if storeApp:
           self.ninja.variable('arch', self.win_env[arch] + 'app')
@@ -464,7 +464,7 @@ class NinjaWriter(object):
           self.ninja.subninja(self._SubninjaNameForArch(arch))
 
       pch = None
-      if self.flavor == 'win' or self.flavor == 'winrt':
+      if self.flavor == 'win' or self.flavor == 'winuwp':
         gyp.msvs_emulation.VerifyMissingSources(
             sources, self.abs_build_dir, generator_flags, self.GypPathToNinja)
         pch = gyp.msvs_emulation.PrecompiledHeader(
@@ -489,7 +489,7 @@ class NinjaWriter(object):
       link_deps = collections.defaultdict(list)
 
     compile_deps = self.target.actions_stamp or actions_depends
-    if (self.flavor == 'win' or self.flavor == 'winrt') and self.target.type == 'static_library':
+    if (self.flavor == 'win' or self.flavor == 'winuwp') and self.target.type == 'static_library':
       self.target.component_objs = link_deps
       self.target.compile_deps = compile_deps
 
@@ -538,7 +538,7 @@ class NinjaWriter(object):
 
   def WriteWinIdlFiles(self, spec, prebuild):
     """Writes rules to match MSVS's implicit idl handling."""
-    assert self.flavor == 'win' or self.flavor == 'winrt'
+    assert self.flavor == 'win' or self.flavor == 'winuwp'
     if self.msvs_settings.HasExplicitIdlRulesOrActions(spec):
       return []
     outputs = []
@@ -567,10 +567,10 @@ class NinjaWriter(object):
     if 'copies' in spec:
       outputs += self.WriteCopies(spec['copies'], prebuild, mac_bundle_depends)
 
-    if 'sources' in spec and (self.flavor == 'win' or self.flavor == 'winrt'):
+    if 'sources' in spec and (self.flavor == 'win' or self.flavor == 'winuwp'):
       outputs += self.WriteWinIdlFiles(spec, prebuild)
 
-    if 'appx' in spec and (self.flavor == 'win' or self.flavor == 'winrt'):
+    if 'appx' in spec and (self.flavor == 'win' or self.flavor == 'winuwp'):
       outputs += self.WriteAppx(spec['appx'], prebuild)
 
     if self.xcode_settings and self.xcode_settings.IsIosFramework():
@@ -612,7 +612,7 @@ class NinjaWriter(object):
                                              action.get('message', None),
                                              name)
       is_cygwin = (self.msvs_settings.IsRuleRunUnderCygwin(action)
-                   if self.flavor == 'win' or self.flavor == 'winrt' else False)
+                   if self.flavor == 'win' or self.flavor == 'winuwp' else False)
       args = action['action']
       depfile = action.get('depfile', None)
       if depfile:
@@ -656,7 +656,7 @@ class NinjaWriter(object):
           rule.get('message', None),
           ('%s ' + generator_default_variables['RULE_INPUT_PATH']) % name)
       is_cygwin = (self.msvs_settings.IsRuleRunUnderCygwin(rule)
-                   if self.flavor == 'win' or self.flavor == 'winrt' else False)
+                   if self.flavor == 'win' or self.flavor == 'winuwp' else False)
       pool = 'console' if int(rule.get('ninja_use_console', 0)) else None
       rule_name, args = self.WriteNewNinjaRule(
           name, args, description, is_cygwin, env, pool)
@@ -743,7 +743,7 @@ class NinjaWriter(object):
             assert var == None, repr(var)
 
         outputs = [self.GypPathToNinja(o, env) for o in outputs]
-        if self.flavor == 'win' or self.flavor == 'winrt':
+        if self.flavor == 'win' or self.flavor == 'winuwp':
           # WriteNewNinjaRule uses unique_name for creating an rsp file on win.
           extra_bindings.append(('unique_name',
               hashlib.md5(outputs[0]).hexdigest()))
@@ -949,7 +949,7 @@ class NinjaWriter(object):
                     self.xcode_settings.GetCflagsObjC(config_name)
       cflags_objcc = ['$cflags_cc'] + \
                      self.xcode_settings.GetCflagsObjCC(config_name)
-    elif self.flavor == 'win' or self.flavor == 'winrt':
+    elif self.flavor == 'win' or self.flavor == 'winuwp':
       asmflags = self.msvs_settings.GetAsmflags(config_name)
       cflags = self.msvs_settings.GetCflags(config_name)
       cflags_c = self.msvs_settings.GetCflagsC(config_name)
@@ -989,7 +989,7 @@ class NinjaWriter(object):
     defines = config.get('defines', []) + extra_defines
     self.WriteVariableList(ninja_file, 'defines',
                            [Define(d, self.flavor) for d in defines])
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       self.WriteVariableList(ninja_file, 'asmflags',
                              map(self.ExpandSpecial, asmflags))
       self.WriteVariableList(ninja_file, 'rcflags',
@@ -1000,7 +1000,7 @@ class NinjaWriter(object):
     include_dirs = config.get('include_dirs', [])
 
     env = self.GetToolchainEnv()
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       include_dirs = self.msvs_settings.AdjustIncludeDirs(include_dirs,
                                                           config_name)
       if os.environ.get('VS_EXTRA_INCLUDES', '') != None:
@@ -1011,7 +1011,7 @@ class NinjaWriter(object):
         [QuoteShellArgument('-I' + self.GypPathToNinja(i, env), self.flavor)
          for i in include_dirs])
 
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       midl_include_dirs = config.get('midl_include_dirs', [])
       midl_include_dirs = self.msvs_settings.AdjustMidlIncludeDirs(
           midl_include_dirs, config_name)
@@ -1052,11 +1052,11 @@ class NinjaWriter(object):
       if ext in ('cc', 'cpp', 'cxx'):
         command = 'cxx'
         self.uses_cpp = True
-      elif ext == 'c' or (ext == 'S' and self.flavor != 'win' and self.flavor != 'winrt'):
+      elif ext == 'c' or (ext == 'S' and self.flavor != 'win' and self.flavor != 'winuwp'):
         command = 'cc'
-      elif ext == 's' and self.flavor != 'win' and self.flavor != 'winrt':  # Doesn't generate .o.d files.
+      elif ext == 's' and self.flavor != 'win' and self.flavor != 'winuwp':  # Doesn't generate .o.d files.
         command = 'cc_s'
-      elif ((self.flavor == 'win' or self.flavor == 'winrt') and ext == 'asm' and
+      elif ((self.flavor == 'win' or self.flavor == 'winuwp') and ext == 'asm' and
             not self.msvs_settings.HasExplicitAsmRules(spec)):
         command = 'asm'
         # Add the _asm suffix as msvs is capable of handling .cc and
@@ -1067,7 +1067,7 @@ class NinjaWriter(object):
       elif self.flavor == 'mac' and ext == 'mm':
         command = 'objcxx'
         self.uses_cpp = True
-      elif (self.flavor == 'win' or self.flavor == 'winrt') and ext == 'rc':
+      elif (self.flavor == 'win' or self.flavor == 'winuwp') and ext == 'rc':
         command = 'rc'
         obj_ext = '.res'
         has_rc_source = True
@@ -1080,7 +1080,7 @@ class NinjaWriter(object):
         output = AddArch(output, arch)
       implicit = precompiled_header.GetObjDependencies([input], [output], arch)
       variables = []
-      if self.flavor == 'win' or self.flavor == 'winrt':
+      if self.flavor == 'win' or self.flavor == 'winuwp':
         variables, output, implicit = precompiled_header.GetFlagsModifications(
             input, output, implicit, command, cflags_c, cflags_cc,
             self.ExpandSpecial)
@@ -1179,13 +1179,13 @@ class NinjaWriter(object):
         linkable = target.Linkable()
         if linkable:
           new_deps = []
-          if ((self.flavor == 'win' or self.flavor == 'winrt') and
+          if ((self.flavor == 'win' or self.flavor == 'winuwp') and
               target.component_objs and
               self.msvs_settings.IsUseLibraryDependencyInputs(config_name)):
             new_deps = target.component_objs
             if target.compile_deps:
               order_deps.add(target.compile_deps)
-          elif (self.flavor == 'win' or self.flavor == 'winrt') and target.import_lib:
+          elif (self.flavor == 'win' or self.flavor == 'winuwp') and target.import_lib:
             new_deps = [target.import_lib]
           elif target.UsesToc(self.flavor):
             solibs.add(target.binary)
@@ -1202,7 +1202,7 @@ class NinjaWriter(object):
           implicit_deps.add(final_output)
 
     extra_bindings = []
-    if self.uses_cpp and self.flavor != 'win' and self.flavor != 'winrt':
+    if self.uses_cpp and self.flavor != 'win' and self.flavor != 'winuwp':
       extra_bindings.append(('ld', '$ldxx'))
 
     output = self.ComputeOutput(spec, arch)
@@ -1218,7 +1218,7 @@ class NinjaWriter(object):
           self.ExpandSpecial(generator_default_variables['PRODUCT_DIR']),
           self.GypPathToNinja, arch)
       ldflags = env_ldflags + ldflags
-    elif self.flavor == 'win' or self.flavor == 'winrt':
+    elif self.flavor == 'win' or self.flavor == 'winuwp':
       manifest_base_name = self.GypPathToUniqueOutput(
           self.ComputeOutputFileName(spec))
       ldflags, intermediate_manifest, manifest_files = \
@@ -1253,7 +1253,7 @@ class NinjaWriter(object):
                            map(self.ExpandSpecial, ldflags))
 
     library_dirs = config.get('library_dirs', [])
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       library_dirs = [self.msvs_settings.ConvertVSMacros(l, config_name)
                       for l in library_dirs]
       library_dirs = ['/LIBPATH:' + QuoteShellArgument(self.GypPathToNinja(l),
@@ -1268,7 +1268,7 @@ class NinjaWriter(object):
                                        spec.get('libraries', [])))
     if self.flavor == 'mac':
       libraries = self.xcode_settings.AdjustLibraries(libraries, config_name)
-    elif self.flavor == 'win' or self.flavor == 'winrt':
+    elif self.flavor == 'win' or self.flavor == 'winuwp':
       libraries = self.msvs_settings.AdjustLibraries(libraries)
 
     self.WriteVariableList(ninja_file, 'libs', library_dirs + libraries)
@@ -1279,7 +1279,7 @@ class NinjaWriter(object):
       extra_bindings.append(('soname', os.path.split(output)[1]))
       extra_bindings.append(('lib',
                             gyp.common.EncodePOSIXShellArgument(output)))
-      if self.flavor != 'win' and self.flavor != 'winrt':
+      if self.flavor != 'win' and self.flavor != 'winuwp':
         link_file_list = output
         if self.is_mac_bundle:
           # 'Dependency Framework.framework/Versions/A/Dependency Framework' ->
@@ -1296,7 +1296,7 @@ class NinjaWriter(object):
         extra_bindings.append(
           ('link_file_list',
             gyp.common.EncodePOSIXShellArgument(link_file_list)))
-      if self.flavor == 'win' or self.flavor == 'winrt':
+      if self.flavor == 'win' or self.flavor == 'winuwp':
         extra_bindings.append(('binary', output))
         if ('/NOENTRY' not in ldflags and
             not self.msvs_settings.GetNoImportLibrary(config_name)):
@@ -1312,7 +1312,7 @@ class NinjaWriter(object):
         output = [output, output + '.TOC']
       else:
         command = command + '_notoc'
-    elif self.flavor == 'win' or self.flavor == 'winrt':
+    elif self.flavor == 'win' or self.flavor == 'winuwp':
       extra_bindings.append(('binary', output))
       pdbname = self.msvs_settings.GetPDBName(
           config_name, self.ExpandSpecial, output + '.pdb')
@@ -1341,7 +1341,7 @@ class NinjaWriter(object):
       self.target.type = 'none'
     elif spec['type'] == 'static_library':
       self.target.binary = self.ComputeOutput(spec)
-      if (self.flavor not in ('mac', 'openbsd', 'netbsd', 'win', 'winrt') and not
+      if (self.flavor not in ('mac', 'openbsd', 'netbsd', 'win', 'winuwp') and not
           self.is_standalone_static_library):
         self.ninja.build(self.target.binary, 'alink_thin', link_deps,
                          order_only=compile_deps)
@@ -1408,7 +1408,7 @@ class NinjaWriter(object):
   def GetToolchainEnv(self, additional_settings=None):
     """Returns the variables toolchain would set for build steps."""
     env = self.GetSortedXcodeEnv(additional_settings=additional_settings)
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       env = self.GetMsvsToolchainEnv(
           additional_settings=additional_settings)
     return env
@@ -1552,7 +1552,7 @@ class NinjaWriter(object):
     """Compute the path for the final output of the spec."""
     type = spec['type']
 
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       override = self.msvs_settings.GetOutputName(self.config_name,
                                                   self.ExpandSpecial)
       if override:
@@ -1573,7 +1573,7 @@ class NinjaWriter(object):
     type_in_output_root = ['executable', 'loadable_module']
     if self.flavor == 'mac' and self.toolset == 'target':
       type_in_output_root += ['shared_library', 'static_library']
-    elif (self.flavor == 'win' or self.flavor == 'winrt') and self.toolset == 'target':
+    elif (self.flavor == 'win' or self.flavor == 'winuwp') and self.toolset == 'target':
       type_in_output_root += ['shared_library']
 
     if arch is not None:
@@ -1606,7 +1606,7 @@ class NinjaWriter(object):
     Returns the name of the new rule, and a copy of |args| with variables
     expanded."""
 
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       args = [self.msvs_settings.ConvertVSMacros(
                   arg, self.base_to_build, config=self.config_name)
               for arg in args]
@@ -1639,7 +1639,7 @@ class NinjaWriter(object):
     rspfile = None
     rspfile_content = None
     args = [self.ExpandSpecial(arg, self.base_to_build) for arg in args]
-    if self.flavor == 'win' or self.flavor == 'winrt':
+    if self.flavor == 'win' or self.flavor == 'winuwp':
       rspfile = rule_name + '.$unique_name.rsp'
       # The cygwin case handles this inside the bash sub-shell.
       run_in = '' if is_cygwin else ' ' + self.build_to_base
@@ -1690,13 +1690,13 @@ def CalculateVariables(default_variables, params):
     global generator_extra_sources_for_rules
     generator_extra_sources_for_rules = getattr(xcode_generator,
         'generator_extra_sources_for_rules', [])
-  elif flavor == 'win' or flavor == 'winrt':
+  elif flavor == 'win' or flavor == 'winuwp':
     exts = gyp.MSVSUtil.TARGET_TYPE_EXT
     default_variables.setdefault('OS', 'win')
     if flavor == 'win':
       default_variables.setdefault('OS_RUNTIME', 'win32')
-    elif flavor == 'winrt':
-      default_variables.setdefault('OS_RUNTIME', 'winrt')
+    elif flavor == 'winuwp':
+      default_variables.setdefault('OS_RUNTIME', 'winuwp')
     default_variables['EXECUTABLE_SUFFIX'] = '.' + exts['executable']
     default_variables['STATIC_LIB_PREFIX'] = ''
     default_variables['STATIC_LIB_SUFFIX'] = '.' + exts['static_library']
@@ -1900,7 +1900,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
   # - If there is no 'make_global_settings' for CC.host/CXX.host or
   #   'CC_host'/'CXX_host' enviroment variable, cc_host/cxx_host should be set
   #   to cc/cxx.
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     ar = 'lib.exe'
     # cc and cxx must be set to the correct architecture by overriding with one
     # of cl_x86 or cl_x64 below.
@@ -1976,7 +1976,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
   if mac_toolchain_dir:
     wrappers['LINK'] = "export DEVELOPER_DIR='%s' &&" % mac_toolchain_dir
 
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     configs = [target_dicts[qualified_target]['configurations'][config_name]
                for qualified_target in target_list]
     shared_system_includes = None
@@ -2002,7 +2002,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
   cxx = GetEnvironFallback(['CXX_target', 'CXX'], cxx)
   master_ninja.variable('cxx', CommandWithWrapper('CXX', wrappers, cxx))
 
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     master_ninja.variable('ld', ld)
     master_ninja.variable('idl', 'midl.exe')
     master_ninja.variable('ar', ar)
@@ -2045,7 +2045,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
                           CommandWithWrapper('CC.host', wrappers, cc_host))
     master_ninja.variable('cxx_host',
                           CommandWithWrapper('CXX.host', wrappers, cxx_host))
-    if flavor == 'win' or flavor == 'winrt':
+    if flavor == 'win' or flavor == 'winuwp':
       master_ninja.variable('ld_host', ld_host)
     else:
       master_ninja.variable('ld_host', CommandWithWrapper(
@@ -2058,9 +2058,9 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
   master_ninja.pool('link_pool', depth=GetDefaultConcurrentLinks())
   master_ninja.newline()
 
-  deps = 'msvc' if flavor == 'win' or flavor == 'winrt' else 'gcc'
+  deps = 'msvc' if flavor == 'win' or flavor == 'winuwp' else 'gcc'
 
-  if flavor != 'win' and flavor != 'winrt':
+  if flavor != 'win' and flavor != 'winuwp':
     master_ninja.rule(
       'cc',
       description='CC $out',
@@ -2129,7 +2129,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
                '$arch $asm $defines $includes $asmflags /c /Fo $out $in' %
                sys.executable))
 
-  if flavor != 'mac' and flavor != 'win' and flavor != 'winrt':
+  if flavor != 'mac' and flavor != 'win' and flavor != 'winuwp':
     master_ninja.rule(
       'alink',
       description='AR $out',
@@ -2179,7 +2179,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
       command=('$ld $ldflags -o $out '
                '-Wl,--start-group $in -Wl,--end-group $solibs $libs'),
       pool='link_pool')
-  elif flavor == 'win' or flavor == 'winrt':
+  elif flavor == 'win' or flavor == 'winuwp':
     master_ninja.rule(
         'alink',
         description='LIB $out',
@@ -2329,7 +2329,7 @@ def GenerateOutputForConfig(target_list, target_dicts, data, params,
       description='PACKAGE IOS FRAMEWORK $out, POSTBUILDS',
       command='./gyp-mac-tool package-ios-framework $out $postbuilds '
               '&& touch $out')
-  if flavor == 'win' or flavor == 'winrt':
+  if flavor == 'win' or flavor == 'winuwp':
     master_ninja.rule(
       'stamp',
       description='STAMP $out',
@@ -2492,7 +2492,7 @@ def GenerateOutput(target_list, target_dicts, data, params):
       target_dicts)
 
   user_config = params.get('generator_flags', {}).get('config', None)
-  if gyp.common.GetFlavor(params) == 'win' or gyp.common.GetFlavor(params) == 'winrt':
+  if gyp.common.GetFlavor(params) == 'win' or gyp.common.GetFlavor(params) == 'winuwp':
     target_list, target_dicts = MSVSUtil.ShardTargets(target_list, target_dicts)
     target_list, target_dicts = MSVSUtil.InsertLargePdbShims(
         target_list, target_dicts, generator_default_variables)

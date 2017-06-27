@@ -5,16 +5,16 @@
 {
   'targets': [
     {
-      'target_name': 'test-compile-as-winrt',
+      'target_name': 'test-compile-as-winuwp',
       'type': 'executable',
       'msvs_windows_sdk_version': 'v10.0',
       'msvs_settings': {
         'VCCLCompilerTool': {
           'AdditionalUsingDirectories': ['$(VCInstallDir)vcpackages;$(WindowsSdkDir)UnionMetadata;%(AdditionalUsingDirectories)'],
-          'CompileAsWinRT': 'true'
+          'CompileAsWinUWP': 'true'
         }
       },
-      'sources': ['compile-as-winrt.cc']
+      'sources': ['compile-as-winuwp.cc']
     }
   ]
 }

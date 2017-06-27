@@ -443,7 +443,7 @@ def CopyTool(flavor, out_path, generator_flags={}):
       'solaris': 'flock',
       'mac': 'mac',
       'win': 'win',
-      'winrt': 'win',
+      'winuwp': 'win',
       }.get(flavor, None)
   if not prefix:
     return

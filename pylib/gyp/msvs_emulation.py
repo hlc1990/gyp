@@ -410,8 +410,8 @@ class MsvsSettings(object):
   def IsStoreApp(self, config):
     """Gets whether the app is targetting the store."""
     config = self._TargetConfig(config)
-    linkAsWinRT = self._Setting(('VCLinkerTool', 'LinkAsWinRT'), config)
-    return linkAsWinRT == 'true'
+    linkAsWinUWP = self._Setting(('VCLinkerTool', 'LinkAsWinUWP'), config)
+    return linkAsWinUWP == 'true'
 
   def GetNoImportLibrary(self, config):
     """If NoImportLibrary: true, ninja will not expect the output to include
@@ -507,7 +507,7 @@ class MsvsSettings(object):
     cflags = []
     cl = self._GetWrapper(self, self.msvs_settings[config],
                           'VCCLCompilerTool', append=cflags)
-    cl('CompileAsWinRT', map={'true': '/ZW'})
+    cl('CompileAsWinUWP', map={'true': '/ZW'})
     return cflags + ['/TP'] + self._GetPchFlags(config, '.cc')
 
   def _GetAdditionalLibraryDirectories(self, root, config, gyp_to_build_path):
@@ -606,7 +606,7 @@ class MsvsSettings(object):
             '2': 'WINDOWS%s' % minimum_required_version},
        prefix='/SUBSYSTEM:')
 
-    ld('LinkAsWinRT', map={'true': '/APPCONTAINER'})
+    ld('LinkAsWinUWP', map={'true': '/APPCONTAINER'})
 
     stack_reserve_size = self._Setting(
         ('VCLinkerTool', 'StackReserveSize'), config, default='')

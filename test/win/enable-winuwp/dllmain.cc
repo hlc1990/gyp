@@ -12,7 +12,7 @@ using namespace Microsoft::WRL::Wrappers;
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Graphics::Display;
 
-bool TryToUseSomeWinRT() {
+bool TryToUseSomeWinUWP() {
   ComPtr<IDisplayPropertiesStatics> dp;
   HStringReference s(RuntimeClass_Windows_Graphics_Display_DisplayProperties);
   HRESULT hr = GetActivationFactory(s.Get(), dp.GetAddressOf());

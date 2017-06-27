@@ -348,7 +348,7 @@ def gyp_main(args):
 
   parser.add_option('-M', '--multiple-platforms', dest='multiple_platforms',
                     action='append', default=[],
-                    help='Generate projects for multiple winrt platforms at the same time. Difference will be seen '
+                    help='Generate projects for multiple winuwp platforms at the same time. Difference will be seen '
                          'in projects names')
 
   options, build_files_arg = parser.parse_args(args)
@@ -506,21 +506,21 @@ def gyp_main(args):
     #print >> sys.stdout, "targetArchitecture: " + targetArchitecture
     if not options.defines:
       options.defines = []
-    if format == 'msvs-winrt' and options.multiple_platforms:
+    if format == 'msvs-winuwp' and options.multiple_platforms:
       platforms.extend(options.multiple_platforms)
     elif options.multiple_platforms:
-      print >> sys.stdout, '-M and --multiple-platforms options can be used only when gyp generators is msvs-winrt'
+      print >> sys.stdout, '-M and --multiple-platforms options can be used only when gyp generators is msvs-winuwp'
     else:
-      if format == 'msvs-winrt':
-        platforms.append(cmdline_default_variables.get('winrt_platform', ''))
+      if format == 'msvs-winuwp':
+        platforms.append(cmdline_default_variables.get('winuwp_platform', ''))
       else:
         platforms.append('')
 
     for platform in platforms:
       currentDefine = ''
       if platform != '':
-	if format == 'msvs-winrt':
-          currentDefine = 'winrt_platform=' + platform
+	if format == 'msvs-winuwp':
+          currentDefine = 'winuwp_platform=' + platform
 	  if platform == 'win10':
 	    if targetArchitecture == '':
 	      targetArchitecture = 'x86'
@@ -535,8 +535,8 @@ def gyp_main(args):
             options.outputDirSuffix = '_' + platform
         options.defines.append(currentDefine)
         defines.append(currentDefine)
-        cmdline_default_variables['winrt_platform'] = platform
-        print  >> sys.stdout, "Winrt platform: " + platform
+        cmdline_default_variables['winuwp_platform'] = platform
+        print  >> sys.stdout, "WinUWP platform: " + platform
 
       params = {'options': options,
                 'build_files': build_files,
@@ -575,8 +575,8 @@ def gyp_main(args):
         defines.remove(currentDefine)
       if currentDefine in options.defines:
         options.defines.remove(currentDefine)
-      if cmdline_default_variables.has_key('winrt_platform'):
-        cmdline_default_variables.pop('winrt_platform')
+      if cmdline_default_variables.has_key('winuwp_platform'):
+        cmdline_default_variables.pop('winuwp_platform')
 
   # Done
   return 0

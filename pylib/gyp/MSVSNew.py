@@ -272,8 +272,8 @@ class MSVSSolution(object):
           f.write('\tEndProjectSection\r\n')
 
       if isinstance(e, MSVSProject):
-        # WinRT uses project references instead of dependencies.
-        if e.dependencies and not e.spec.get('msvs_enable_winrt'):
+        # WinUWP uses project references instead of dependencies.
+        if e.dependencies and not e.spec.get('msvs_enable_winuwp'):
           f.write('\tProjectSection(ProjectDependencies) = postProject\r\n')
           for d in e.dependencies:
             f.write('\t\t%s = %s\r\n' % (d.get_guid(), d.get_guid()))
@@ -298,8 +298,8 @@ class MSVSSolution(object):
       if isinstance(e, MSVSProject):
         config_guids.append(e.get_guid())
         config_guids_overrides[e.get_guid()] = e.config_platform_overrides
-        # Mark executables on WinRT as deployable in the configuration manager.
-        if e.spec.get('msvs_enable_winrt') and e.spec.get('type') == 'executable':
+        # Mark executables on WinUWP as deployable in the configuration manager.
+        if e.spec.get('msvs_enable_winuwp') and e.spec.get('type') == 'executable':
             deploy_guids.append(e.get_guid())
     config_guids.sort()
 

@@ -5,32 +5,28 @@
 {
  'targets': [
     {
-      'target_name': 'enable_winrt_81_revision_dll',
+      'target_name': 'enable_winuwp_dll',
       'type': 'shared_library',
-      'msvs_enable_winrt': 1,
-      'msvs_application_type_revision': '8.1'
+      'msvs_enable_winuwp': 1,
       'sources': [
         'dllmain.cc',
       ],
     },
     {
-      'target_name': 'enable_winrt_82_revision_dll',
+      'target_name': 'enable_winuwp_missing_dll',
       'type': 'shared_library',
-      'msvs_enable_winrt': 1,
-      'msvs_application_type_revision': '8.2'
       'sources': [
         'dllmain.cc',
       ],
     },
     {
-      'target_name': 'enable_winrt_invalid_revision_dll',
+      'target_name': 'enable_winuwp_winphone_dll',
       'type': 'shared_library',
-      'msvs_enable_winrt': 1,
-      'msvs_application_type_revision': '999'
+      'msvs_enable_winuwp': 1,
+      'msvs_enable_winphone': 1,
       'sources': [
         'dllmain.cc',
       ],
-    },
       'msvs_settings': {
         'VCLinkerTool': {
           'AdditionalDependencies': [

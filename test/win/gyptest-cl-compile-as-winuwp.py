@@ -13,8 +13,8 @@ if (sys.platform == 'win32' and
 
   CHDIR = 'compiler-flags'
 
-  test.run_gyp('compile-as-winrt.gyp', chdir=CHDIR)
+  test.run_gyp('compile-as-winuwp.gyp', chdir=CHDIR)
 
-  test.build('compile-as-winrt.gyp', 'test-compile-as-winrt', chdir=CHDIR)
+  test.build('compile-as-winuwp.gyp', 'test-compile-as-winuwp', chdir=CHDIR)
 
   test.pass_test()
