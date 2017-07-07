@@ -507,7 +507,7 @@ class MsvsSettings(object):
     cflags = []
     cl = self._GetWrapper(self, self.msvs_settings[config],
                           'VCCLCompilerTool', append=cflags)
-    cl('CompileAsWinUWP', map={'true': '/ZW'})
+    cl('CompileAsWinRT', map={'true': '/ZW'})
     return cflags + ['/TP'] + self._GetPchFlags(config, '.cc')
 
   def _GetAdditionalLibraryDirectories(self, root, config, gyp_to_build_path):

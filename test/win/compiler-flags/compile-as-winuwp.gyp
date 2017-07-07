@@ -11,7 +11,7 @@
       'msvs_settings': {
         'VCCLCompilerTool': {
           'AdditionalUsingDirectories': ['$(VCInstallDir)vcpackages;$(WindowsSdkDir)UnionMetadata;%(AdditionalUsingDirectories)'],
-          'CompileAsWinUWP': 'true'
+          'CompileAsWinRT': 'true'
         }
       },
       'sources': ['compile-as-winuwp.cc']

@@ -258,7 +258,7 @@ def _ToolSetOrAppend(tools, tool_name, setting, value, only_if_unset=False):
   if not tools.get(tool_name):
     tools[tool_name] = dict()
   tool = tools[tool_name]
-  if 'CompileAsWinUWP' == setting:
+  if 'CompileAsWinRT' == setting:
     return
   if tool.get(setting):
     if only_if_unset: return
@@ -3162,9 +3162,9 @@ def _FinalizeMSBuildSettings(spec, configuration):
     _ToolAppend(msbuild_settings, 'ClCompile', 'PrecompiledHeader', 'NotUsing')
   # Turn off WinUWP compilation
   if spec['type'] == 'executable' and spec.get('msvs_enable_winuwp') == '1':
-    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinUWP', 'true', True)
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'true', True)
   else:
-    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinUWP', 'false', True)
+    _ToolAppend(msbuild_settings, 'ClCompile', 'CompileAsWinRT', 'false', True)
   # Turn on import libraries if appropriate
   if spec.get('msvs_requires_importlibrary'):
    _ToolAppend(msbuild_settings, '', 'IgnoreImportLibrary', 'false')
@@ -3316,7 +3316,7 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
         if spec.get('msvs_enable_winuwp') == '1':
           basename, extension = os.path.splitext(source)
           if extension in ['.cc', '.cpp', '.cxx']:
-            detail.append(['CompileAsWinUWP', 'true'])
+            detail.append(['CompileAsWinRT', 'true'])
             detail.append(['ExceptionHandling', 'sync'])
           #Only Windows Phone (ARM) uses external assembler
           elif ((spec.get('msvs_enable_winphone') == '1') and ((extension in ['.s', '.S']) or (extension in ['.asm']))):
@@ -3325,14 +3325,14 @@ def _AddSources2(spec, sources, exclusions, grouped_sources,
             rule_name = extension_to_rule_name.get(extension)
             if (not((rule_name != None) and ((rule_name == 'convert_asm_For_WP') or (rule_name == 'gas_preprocessor')))):
               detail.append(['FileType', 'Document'])
-              detail.append(['CompileAsWinUWP', 'false'])
+              detail.append(['CompileAsWinRT', 'false'])
               detail.append(['ExcludedFromBuild', 'No'])
               detail.append(['Command', 'armasm -via armasm_ms.config -16 ' + source + ' -o ' + basename + '.obj'])
               detail.append(['Outputs', basename + '.obj'])
           else:
-            if ['CompileAsWinUWP', 'true'] in detail:
-              detail.remove(['CompileAsWinUWP', 'true'])
-            detail.append(['CompileAsWinUWP', 'false'])
+            if ['CompileAsWinRT', 'true'] in detail:
+              detail.remove(['CompileAsWinRT', 'true'])
+            detail.append(['CompileAsWinRT', 'false'])
 
         # Special attribute for xaml dependent source files.
         if spec.get('msvs_enable_winuwp') == '1':
